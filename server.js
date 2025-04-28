@@ -45,7 +45,7 @@ main().then(() => {
     console.log(err);
 })
 async function main() {
-    await mongoose.connect('mongodb+srv://skillSwap:skillSwap_pratik@cluster0.qfkjieh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0');
+    await mongoose.connect(process.env.db_string);
 }
 
 // app.get("/home", async (req, res)=>{
