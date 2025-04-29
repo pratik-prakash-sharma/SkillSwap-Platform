@@ -96,6 +96,13 @@ app.post("/user/register", async (req, res) => {
     try {
         let { name, username, email, mobile, password } = req.body;
 
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailRegex.test(email)) {
+    return res.status(400).send('Invalid email address.');
+  }
+
         // Check if username, email, or mobile number is already registered
         const existingUser = await User.findOne({ $or: [{ username }, { email }, { mobile }] });
         if (existingUser) {
@@ -617,8 +624,8 @@ app.post("/swap/confirm/:id", async (req, res) => {
 // app.listen(8080, ()=>{
 //     console.log("server is running on port 8080");
 // })
-// server.listen(8080, () => {
-//     console.log("WebSocket server is running on port 8080");
-// });
-module.exports = server;
+server.listen(8080, () => {
+    console.log("WebSocket server is running on port 8080");
+});
+
 
