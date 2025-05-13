@@ -6,52 +6,34 @@ const methodOverride = require("method-override");
 const session = require("express-session");
 const bcrypt = require("bcrypt");
 const validator = require("validator");
-const saltRounds = 10;
-const http = require("http");
-const socketIo = require("socket.io");
-// const twilio = require("twilio");
 require("dotenv").config();
-const User = require("./models/user.js");
-const Skill = require("./models/skill.js");
+
+// Models
+const User = require("./models/user");
+const Skill = require("./models/skill");
 const Notification = require("./models/Notification");
+const SwapRequest = require("./models/swapRequest");
 
+// Middleware setup
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+app.use(express.static(path.join(__dirname, "public")));
+app.use(methodOverride("_method"));
+app.use(express.urlencoded({ extended: true }));
 
-app.set("view engine", "ejs")
-app.set("views", path.join(__dirname, "views"))
-app.use(express.static(path.join(__dirname, "public")))
-app.use(methodOverride("_method"))
-app.use(express.urlencoded({ extended: true }))
 app.use(session({
-    secret: 'your_secret_key',
-    resave: false,
-    saveUninitialized: true
+  secret: process.env.SESSION_SECRET || "secret",
+  resave: false,
+  saveUninitialized: true,
 }));
-// const client = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-// Create HTTP server
-const server = http.createServer(app);
-const io = socketIo(server); 
-io.on("connection", (socket) => {
-    console.log("A user connected");
+// MongoDB connection
+mongoose.connect(process.env.db_string)
+  .then(() => console.log("Connected to MongoDB"))
+  .catch(console.error);
 
-    socket.on("disconnect", () => {
-        console.log("A user disconnected");
-    });
-});
 
-main().then(() => {
-    console.log("Connection successful");
-}).catch((err) => {
-    console.log(err);
-})
-async function main() {
-    await mongoose.connect(process.env.db_string);
-}
 
-// app.get("/home", async (req, res)=>{
-//     const skills = await Skill.find();
-//     res.render("home.ejs", {skills});
-// })
 app.get("/home", async (req, res) => {
     // const skills = await Skill.find();
     // if (!req.session.user) return res.redirect("/user");
@@ -66,42 +48,17 @@ app.get("/user", (req, res) => {
 
 // user registration
 
-// app.post("/user/register", async (req, res) => {
-//     try {
-//         let { name, username, email, mobile, password } = req.body;
-
-//          // Check if username or mobile number is already registered
-//          const existingUser = await User.findOne({ $or: [{ username }, { mobile }] });
-//          if (existingUser) {
-//              return res.send("Username or Mobile Number already in use.");
-//          }
-
-//             // Enforce strong password
-//         if (!validator.isStrongPassword(password, { minLength: 8, minNumbers: 1, minUppercase: 1, minSymbols: 1 })) {
-//             return res.send("Password must be at least 8 characters long, with 1 uppercase letter, 1 number, and 1 special character.");
-//         }
-
-//         const hashedPassword = await bcrypt.hash(password, saltRounds);
-//         let newUser = new User({ name, username, email, mobile, password: hashedPassword });
-//         await newUser.save();
-//         res.redirect("/user");
-//     } catch (err) {
-//         console.log(err);
-//         res.send("Error registering user");
-//     }
-// });
-
 
 app.post("/user/register", async (req, res) => {
     try {
         let { name, username, email, mobile, password } = req.body;
 
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  if (!emailRegex.test(email)) {
-    return res.status(400).send('Invalid email address.');
-  }
+        if (!emailRegex.test(email)) {
+            return res.status(400).send('Invalid email address.');
+        }
 
         // Check if username, email, or mobile number is already registered
         const existingUser = await User.findOne({ $or: [{ username }, { email }, { mobile }] });
@@ -182,7 +139,6 @@ app.post("/user/login", async (req, res) => {
 
 app.get("/profile", async (req, res) => {
     if (!req.session.user) return res.redirect("/login");
-
     try {
         const userSkills = await Skill.find({ user: req.session.user._id });
 
@@ -434,23 +390,23 @@ app.post("/swap/respond", async (req, res) => {
         //         try {
         //             const requestId = req.params.requestId;
         //             const swapRequest = await SwapRequest.findById(requestId);
-            
+
         //             if (!swapRequest) {
         //                 return res.status(404).send("Request not found");
         //             }
-            
+
         //             swapRequest.status = "rejected";
         //             await swapRequest.save();
-            
+
         //             // Save notification for the requester
         //             const notification = new Notification({
         //                 user: swapRequest.requester, // The user who sent the swap request
         //                 message: "Your swap request was rejected.",
         //                 status: "unread",
         //             });
-            
+
         //             await notification.save();
-                    
+
         //             res.redirect("/swap-requests"); // Redirect back to requests page
         //         } catch (error) {
         //             console.error("Error rejecting swap request:", error);
@@ -506,7 +462,7 @@ app.get("/requests", async (req, res) => {
         const userId = req.session.user._id;
 
 
-        
+
         const allRequests = await SwapRequest.find();
         // console.log("All Swap Requests in DB:", allRequests);
 
@@ -514,7 +470,7 @@ app.get("/requests", async (req, res) => {
             .populate("requester", "username email mobile")
             .populate("receiver", "username email");
 
-            // console.log(requests.requester.phoneNumber);
+        // console.log(requests.requester.phoneNumber);
 
         res.render("requests", { user: req.session.user, requests });
     } catch (err) {
@@ -524,7 +480,7 @@ app.get("/requests", async (req, res) => {
     }
 });
 
-app.get("/swap/pending", async (req, res)=>{
+app.get("/swap/pending", async (req, res) => {
     try {
         if (!req.session.user) {
             return res.redirect("/login");
@@ -541,7 +497,7 @@ app.get("/swap/pending", async (req, res)=>{
             .populate("requester", "username email mobile")
             .populate("receiver", "username email");
 
-            // console.log(requests.requester.phoneNumber);
+        // console.log(requests.requester.phoneNumber);
 
         res.render("requests", { user: req.session.user, requests });
     } catch (err) {
@@ -594,7 +550,7 @@ app.post("/swap/accept/:id", async (req, res) => {
         swapRequest.status = "accepted";
         await swapRequest.save();
 
-        res.redirect("/requests"); 
+        res.redirect("/requests");
     } catch (err) {
         console.error("Error accepting request:", err);
         res.redirect("/requests");
@@ -610,7 +566,7 @@ app.post("/swap/confirm/:id", async (req, res) => {
         const swapRequest = await SwapRequest.findById(req.params.id);
         if (!swapRequest) return res.redirect("/requests");
 
-      
+
         swapRequest.status = "swapped";
         await swapRequest.save();
 
@@ -621,11 +577,5 @@ app.post("/swap/confirm/:id", async (req, res) => {
     }
 });
 
-// app.listen(8080, ()=>{
-//     console.log("server is running on port 8080");
-// })
-server.listen(8080, () => {
-    console.log("WebSocket server is running on port 8080");
-});
-
-
+// ✅ At the end:
+module.exports = app;
